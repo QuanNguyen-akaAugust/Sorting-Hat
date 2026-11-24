@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mũ Phân Loại – Bạn thuộc nhà nào?</title>
+<style>
+  :root{--bg:#14101f;--card:#1f1a30;--text:#f2ecde;--muted:#a89fbd;--gold:#d9b25f}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#2a2145 0,var(--bg) 60%);color:var(--text);
+    font-family:Georgia,"Times New Roman",serif;display:flex;justify-content:center;padding:24px 16px}
+  main{width:100%;max-width:560px}
+  h1{text-align:center;font-size:28px;margin:8px 0 4px;color:var(--gold);letter-spacing:.04em}
+  .sub{text-align:center;color:var(--muted);margin:0 0 24px;font-size:15px}
+  .card{background:var(--card);border:1px solid #3a3257;border-radius:16px;padding:24px}
+  .progress{height:6px;background:#332b4d;border-radius:3px;margin-bottom:20px;overflow:hidden}
+  .progress i{display:block;height:100%;background:var(--gold);transition:width .3s}
+  .q{font-size:20px;line-height:1.4;margin:0 0 18px}
+  .opt{display:block;width:100%;text-align:left;margin:0 0 10px;padding:14px 16px;font:inherit;font-size:16px;color:var(--text);
+    background:#2a2342;border:1px solid #433a66;border-radius:10px;cursor:pointer;transition:.15s}
+  .opt:hover,.opt:focus-visible{border-color:var(--gold);background:#352c55;outline:none}
+  .btn{display:inline-block;margin-top:16px;padding:12px 22px;font:inherit;font-size:16px;color:#1a1428;background:var(--gold);
+    border:0;border-radius:10px;cursor:pointer}
+  .center{text-align:center}
+  .emblem{width:170px;height:170px;margin:0 auto 8px;display:block}
+  .house{font-size:32px;margin:6px 0;letter-spacing:.03em}
+  .trait{color:var(--muted);margin:0 0 6px}
+  .scores{margin-top:22px;text-align:left}
+  .row{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:14px}
+  .row span:first-child{width:90px}
+  .bar{flex:1;height:10px;background:#332b4d;border-radius:5px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:5px;transition:width .6s}
+  .row b{width:24px;text-align:right}
+  .multi{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+  .multi>div{flex:1;min-width:200px}
+  .hidden{display:none}
+  .note{color:var(--muted);font-size:13px;text-align:center;margin-top:16px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Mũ Phân Loại</h1>
+  <p class="sub">Trả lời 3 câu hỏi để biết bạn thuộc nhà nào</p>
+  <div class="card" id="card"></div>
+  <p class="note">Sản phẩm giải trí do người hâm mộ tạo, không liên kết với các chủ sở hữu thương hiệu Harry Potter.</p>
+</main>
+
+<script>
+/* ====== Cấu hình ====== */
+// Dán URL Google Apps Script (Web app) vào đây để nhận kết quả vào Google Sheet. Để trống = không gửi.
+const ENDPOINT = "https://script.google.com/macros/s/AKfycbxeh0da1Mzdkji9_XFIJMtg4kfKttKXWUd4Yqncs3CoWEl-n65jR2T8EbrqV8QfIG9LfQ/exec";
+
+// Muốn dùng ảnh riêng: dán ảnh dạng data URI (data:image/png;base64,...) vào "image" của từng nhà.
+const HOUSES = {
+  gryffindor:{name:"Gryffindor",trait:"Dũng cảm, táo bạo, dám đối mặt thử thách.",color:"#c0392b",color2:"#e0a93b",image:null},
+  hufflepuff:{name:"Hufflepuff",trait:"Chăm chỉ, trung thành, công bằng.",color:"#e0b92f",color2:"#3b3b3b",image:null},
+  ravenclaw:{name:"Ravenclaw",trait:"Thông minh, ham học hỏi, sáng tạo.",color:"#2e5aa8",color2:"#b08a4a",image:null},
+  slytherin:{name:"Slytherin",trait:"Tham vọng, khéo léo, quyết đoán.",color:"#2a7a4b",color2:"#aab4b0",image:null}
+};
+
+// Mỗi đáp án cộng điểm cho các nhà (giống code Python gốc)
+const QUESTIONS = [
+  {q:"Bạn thích bình minh hay hoàng hôn?",
+   a:[{t:"Bình minh",s:{gryffindor:1,ravenclaw:1}},
+      {t:"Hoàng hôn",s:{hufflepuff:1,slytherin:1}}]},
+  {q:"Khi qua đời, bạn muốn mọi người nhớ đến mình là:",
+   a:[{t:"Người tốt bụng",s:{hufflepuff:2}},
+      {t:"Người vĩ đại",s:{slytherin:2}},
+      {t:"Người thông thái",s:{ravenclaw:2}},
+      {t:"Người can đảm",s:{gryffindor:2}}]},
+  {q:"Loại nhạc cụ nào làm bạn dễ chịu nhất?",
+   a:[{t:"Đàn violin",s:{slytherin:4}},
+      {t:"Kèn trumpet",s:{hufflepuff:4}},
+      {t:"Piano",s:{ravenclaw:4}},
+      {t:"Trống",s:{gryffindor:4}}]}
+];
+
+/* ====== Biểu tượng gốc (SVG đơn giản, tự vẽ) ====== */
+function emblem(key){
+  const h=HOUSES[key];
+  if(h.image) return `<img class="emblem" src="${h.image}" alt="${h.name}">`;
+  const c=h.color,d=h.color2;
+  const art={
+    gryffindor:`<g fill="${d}"><path d="M100 30l12 18 20-10-4 22 22 2-14 16 18 14-22 4 6 22-24-10-14 18-14-18-24 10 6-22-22-4 18-14-14-16 22-2-4-22 20 10z"/></g>
+      <circle cx="100" cy="104" r="34" fill="#fff3d6"/><circle cx="88" cy="98" r="4" fill="#222"/><circle cx="112" cy="98" r="4" fill="#222"/>
+      <path d="M94 116q6 8 12 0" stroke="#222" stroke-width="3" fill="none"/><path d="M96 108h8l-4 6z" fill="#b34"/>`,
+    hufflepuff:`<ellipse cx="100" cy="106" rx="42" ry="36" fill="#f4efe0"/><path d="M82 70q-6 40 0 72M118 70q6 40 0 72" stroke="#222" stroke-width="16" fill="none" stroke-linecap="round"/>
+      <circle cx="82" cy="72" r="9" fill="#222"/><circle cx="118" cy="72" r="9" fill="#222"/>
+      <circle cx="88" cy="104" r="4" fill="#222"/><circle cx="112" cy="104" r="4" fill="#222"/><ellipse cx="100" cy="120" rx="8" ry="6" fill="#222"/>`,
+    ravenclaw:`<path d="M100 50c-10 16-34 22-64 20 14 10 20 22 22 36 10-8 22-12 42-14 20 2 32 6 42 14 2-14 8-26 22-36-30 2-54-4-64-20z" fill="${d}"/>
+      <path d="M100 62c-6 12-14 20-26 26 8 6 14 18 26 40 12-22 18-34 26-40-12-6-20-14-26-26z" fill="#e9eef7"/><circle cx="100" cy="88" r="5" fill="#222"/><path d="M100 94l-6 10h12z" fill="${d}"/>`,
+    slytherin:`<path d="M60 150c-20-30 10-44 40-34s60-10 40-50c-6-12-22-14-30-4-6 8 0 20 14 18" stroke="${d}" stroke-width="16" fill="none" stroke-linecap="round"/>
+      <circle cx="124" cy="78" r="3.5" fill="#222"/><path d="M144 66l14-6m-14 6l12 8" stroke="#d33" stroke-width="2.5" fill="none"/>`
+  };
+  return `<svg class="emblem" viewBox="0 0 200 200" role="img" aria-label="Biểu tượng nhà ${h.name}">
+    <circle cx="100" cy="100" r="94" fill="${c}" stroke="${d}" stroke-width="6"/>${art[key]}</svg>`;
+}
+
+/* ====== Logic ====== */
+const card=document.getElementById("card");
+let idx=0, score, playerName='';
+
+function start(){
+  idx=0; score={gryffindor:0,hufflepuff:0,ravenclaw:0,slytherin:0};
+  card.innerHTML=`<div class="center"><p class="q">Chiếc Mũ Phân Loại sẽ đặt bạn vào nhà nào?</p>
+    <input id="nm" maxlength="60" placeholder="Nhập tên của bạn" style="width:100%;padding:12px;font:inherit;font-size:16px;border-radius:10px;border:1px solid #433a66;background:#2a2342;color:#f2ecde">
+    <button class="btn" id="go">Bắt đầu</button></div>`;
+  document.getElementById("go").onclick=()=>{
+    const v=document.getElementById("nm").value.trim();
+    if(!v){document.getElementById("nm").focus();return;}
+    playerName=v; showQ();
+  };
+}
+
+function showQ(){
+  const q=QUESTIONS[idx];
+  card.innerHTML=`<div class="progress"><i style="width:${idx/QUESTIONS.length*100}%"></i></div>
+    <p class="q">Câu ${idx+1}/${QUESTIONS.length}: ${q.q}</p>`+
+    q.a.map((o,i)=>`<button class="opt" data-i="${i}">${i+1}) ${o.t}</button>`).join("");
+  card.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
+    const s=q.a[+b.dataset.i].s;
+    for(const k in s) score[k]+=s[k];
+    idx++; idx<QUESTIONS.length?showQ():showResult();
+  });
+}
+
+function showResult(){
+  const max=Math.max(...Object.values(score));
+  const winners=Object.keys(score).filter(k=>score[k]===max);
+  const tops=winners.map(k=>`<div class="center">${emblem(k)}<div class="house" style="color:${HOUSES[k].color2==="#3b3b3b"?HOUSES[k].color:HOUSES[k].color}">${HOUSES[k].name}</div>
+    <p class="trait">${HOUSES[k].trait}</p></div>`).join("");
+  const tie=winners.length>1?`<p class="center trait">Bạn hòa điểm giữa ${winners.length} nhà!</p>`:"";
+  const bars=Object.keys(score).map(k=>`<div class="row"><span>${HOUSES[k].name}</span>
+    <div class="bar"><i style="width:${max?score[k]/max*100:0}%;background:${HOUSES[k].color}"></i></div><b>${score[k]}</b></div>`).join("");
+  if(ENDPOINT){
+    try{fetch(ENDPOINT,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain"},
+      body:JSON.stringify({name:playerName,house:winners.map(k=>HOUSES[k].name).join(" / "),
+      gryffindor:score.gryffindor,hufflepuff:score.hufflepuff,ravenclaw:score.ravenclaw,slytherin:score.slytherin,time:new Date().toISOString()})});}catch(e){}
+  }
+  card.innerHTML=`<p class="center trait">${playerName.replace(/[&<>"']/g,"")}, Mũ Phân Loại đã quyết định...</p>${tie}<div class="multi">${tops}</div>
+    <div class="scores">${bars}</div><div class="center"><button class="btn" id="again">Chơi lại</button></div>`;
+  document.getElementById("again").onclick=start;
+}
+start();
+</script>
+</body>
+</html>
